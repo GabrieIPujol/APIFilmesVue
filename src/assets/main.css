@@ -33,3 +33,11 @@ a,
     padding: 0 2rem;
   }
 }
+
+img.logo-favicon {
+  image-rendering: pixelated;
+  /* Para um visual 8-bit nítido */
+  /* OU */
+  image-rendering: -webkit-optimize-contrast;
+  /* Para manter as bordas nítidas */
+}

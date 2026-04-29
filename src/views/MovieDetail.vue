@@ -1,198 +1,188 @@
 <template>
-    <div class="detail-page">
-      <!-- Back nav -->
-      <nav class="topnav">
-        <button class="back-btn" @click="router.back()">
-          ◄ VOLTAR AO ARQUIVO
-        </button>
-        <div class="breadcrumb">
-          <span>CINERETRO</span>
-          <span class="sep">//</span>
-          <span>DETALHES</span>
-          <span class="sep">//</span>
-          <span class="crumb-title">{{ movie?.title || '...' }}</span>
+  <div class="detail-page">
+    <nav class="topnav">
+      <button class="back-btn" @click="router.back()">
+        ◄ VOLTAR AO ARQUIVO
+      </button>
+      <div class="breadcrumb">
+        <span>CINERETRO</span>
+        <span class="sep">//</span>
+        <span>DETALHES</span>
+        <span class="sep">//</span>
+        <span class="crumb-title">{{ movie?.title || '...' }}</span>
+      </div>
+    </nav>
+
+    <div v-if="loading" class="center-state">
+      <div class="terminal-loader">
+        <div class="term-line" v-for="(l, i) in termLines" :key="i" :style="{ opacity: i < visibleLines ? 1 : 0 }">
+          {{ l }}
         </div>
-      </nav>
-  
-      <!-- Loading -->
-      <div v-if="loading" class="center-state">
-        <div class="terminal-loader">
-          <div class="term-line" v-for="(l, i) in termLines" :key="i" :style="{ opacity: i < visibleLines ? 1 : 0 }">
-            {{ l }}
+      </div>
+    </div>
+
+    <div v-else-if="error" class="center-state error">
+      <p class="err-code">ERR::404</p>
+      <p>{{ error }}</p>
+      <button class="retro-btn" @click="fetchDetail">RETRY</button>
+    </div>
+
+    <div v-else-if="movie" class="detail-content">
+      <div class="hero" :style="backdropStyle">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <div class="poster-col">
+            <div class="poster-frame">
+              <img
+                v-if="movie.poster_path"
+                :src="`https://image.tmdb.org/t/p/w500${movie.poster_path}`"
+                :alt="movie.title"
+                class="hero-poster"
+              />
+              <div v-else class="no-img">▣<br>SEM IMAGEM</div>
+            </div>
+            <div class="poster-badge-row">
+              <div v-if="movie.vote_average" class="big-score">
+                <span class="score-label">NOTA</span>
+                <span class="score-num">{{ movie.vote_average.toFixed(1) }}</span>
+                <span class="score-max">/10</span>
+              </div>
+            </div>
+          </div>
+          <div class="info-col">
+            <div class="title-area">
+              <div class="title-pre">■ ARQUIVO Nº {{ movie.id }}</div>
+              <h1 class="movie-title glow">{{ movie.title }}</h1>
+              <div v-if="movie.tagline" class="tagline">"{{ movie.tagline }}"</div>
+            </div>
+
+            <div class="meta-grid">
+              <div class="meta-item">
+                <span class="meta-label">ANO</span>
+                <span class="meta-val">{{ movie.release_date?.substring(0,4) || 'N/D' }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">DURAÇÃO</span>
+                <span class="meta-val">{{ runtime }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">IDIOMA</span>
+                <span class="meta-val">{{ movie.original_language?.toUpperCase() }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">POPULARIDADE</span>
+                <span class="meta-val">{{ Math.round(movie.popularity) }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">STATUS</span>
+                <span class="meta-val status-tag">{{ translateStatus(movie.status) }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">VOTOS</span>
+                <span class="meta-val">{{ movie.vote_count?.toLocaleString('pt-BR') }}</span>
+              </div>
+            </div>
+
+            <div v-if="movie.genres?.length" class="genres">
+              <span v-for="g in movie.genres" :key="g.id" class="genre-tag">{{ g.name.toUpperCase() }}</span>
+            </div>
+
+            <div class="overview-section">
+              <div class="section-label">■ SINOPSE</div>
+              <p class="overview">{{ movie.overview || 'Sinopse não disponível.' }}</p>
+            </div>
           </div>
         </div>
       </div>
-  
-      <!-- Error -->
-      <div v-else-if="error" class="center-state error">
-        <p class="err-code">ERR::404</p>
-        <p>{{ error }}</p>
-        <button class="retro-btn" @click="fetchDetail">RETRY</button>
-      </div>
-  
-      <!-- Content -->
-      <div v-else-if="movie" class="detail-content">
-        <!-- Hero -->
-        <div class="hero" :style="backdropStyle">
-          <div class="hero-overlay"></div>
-          <div class="hero-content">
-            <div class="poster-col">
-              <div class="poster-frame">
+
+      <div class="panels">
+        <div v-if="cast.length" class="panel">
+          <div class="panel-header">
+            <span class="panel-icon">◈</span> ELENCO PRINCIPAL
+            <span class="panel-count">[{{ cast.length }}]</span>
+          </div>
+          <div class="cast-list">
+            <div v-for="actor in cast" :key="actor.id" class="cast-item">
+              <div class="cast-photo-wrap">
                 <img
-                  v-if="movie.poster_path"
-                  :src="`https://image.tmdb.org/t/p/w500${movie.poster_path}`"
-                  :alt="movie.title"
-                  class="hero-poster"
+                  v-if="actor.profile_path"
+                  :src="`https://image.tmdb.org/t/p/w185${actor.profile_path}`"
+                  :alt="actor.name"
+                  class="cast-photo"
                 />
-                <div v-else class="no-img">▣<br>SEM IMAGEM</div>
+                <div v-else class="cast-no-photo">{{ initials(actor.name) }}</div>
               </div>
-              <div class="poster-badge-row">
-                <div v-if="movie.vote_average" class="big-score">
-                  <span class="score-label">NOTA</span>
-                  <span class="score-num">{{ movie.vote_average.toFixed(1) }}</span>
-                  <span class="score-max">/10</span>
-                </div>
-              </div>
-            </div>
-            <div class="info-col">
-              <div class="title-area">
-                <div class="title-pre">■ ARQUIVO Nº {{ movie.id }}</div>
-                <h1 class="movie-title glow">{{ movie.title }}</h1>
-                <div v-if="movie.tagline" class="tagline">"{{ movie.tagline }}"</div>
-              </div>
-  
-              <div class="meta-grid">
-                <div class="meta-item">
-                  <span class="meta-label">ANO</span>
-                  <span class="meta-val">{{ movie.release_date?.substring(0,4) || 'N/D' }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">DURAÇÃO</span>
-                  <span class="meta-val">{{ runtime }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">IDIOMA</span>
-                  <span class="meta-val">{{ movie.original_language?.toUpperCase() }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">POPULARIDADE</span>
-                  <span class="meta-val">{{ Math.round(movie.popularity) }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">STATUS</span>
-                  <span class="meta-val status-tag">{{ translateStatus(movie.status) }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">VOTOS</span>
-                  <span class="meta-val">{{ movie.vote_count?.toLocaleString('pt-BR') }}</span>
-                </div>
-              </div>
-  
-              <div v-if="movie.genres?.length" class="genres">
-                <span v-for="g in movie.genres" :key="g.id" class="genre-tag">{{ g.name.toUpperCase() }}</span>
-              </div>
-  
-              <div class="overview-section">
-                <div class="section-label">■ SINOPSE</div>
-                <p class="overview">{{ movie.overview || 'Sinopse não disponível.' }}</p>
+              <div class="cast-info">
+                <div class="cast-name">{{ actor.name }}</div>
+                <div class="cast-role">{{ actor.character }}</div>
               </div>
             </div>
           </div>
         </div>
-  
-        <!-- Details panel -->
-        <div class="panels">
-          <!-- Cast -->
-          <div v-if="cast.length" class="panel">
-            <div class="panel-header">
-              <span class="panel-icon">◈</span> ELENCO PRINCIPAL
-              <span class="panel-count">[{{ cast.length }}]</span>
+
+        <div class="panel info-panel">
+          <div class="panel-header"><span class="panel-icon">◈</span> DADOS DE PRODUÇÃO</div>
+          <div class="info-rows">
+            <div v-if="movie.budget" class="info-row">
+              <span class="irow-label">ORÇAMENTO</span>
+              <span class="irow-val">{{ formatMoney(movie.budget) }}</span>
             </div>
-            <div class="cast-list">
-              <div v-for="actor in cast" :key="actor.id" class="cast-item">
-                <div class="cast-photo-wrap">
-                  <img
-                    v-if="actor.profile_path"
-                    :src="`https://image.tmdb.org/t/p/w185${actor.profile_path}`"
-                    :alt="actor.name"
-                    class="cast-photo"
-                  />
-                  <div v-else class="cast-no-photo">{{ initials(actor.name) }}</div>
-                </div>
-                <div class="cast-info">
-                  <div class="cast-name">{{ actor.name }}</div>
-                  <div class="cast-role">{{ actor.character }}</div>
-                </div>
-              </div>
+            <div v-if="movie.revenue" class="info-row">
+              <span class="irow-label">RECEITA</span>
+              <span class="irow-val amber">{{ formatMoney(movie.revenue) }}</span>
+            </div>
+            <div v-if="movie.production_countries?.length" class="info-row">
+              <span class="irow-label">PAÍSES</span>
+              <span class="irow-val">{{ movie.production_countries.map(c => c.name).join(', ') }}</span>
+            </div>
+            <div v-if="movie.production_companies?.length" class="info-row">
+              <span class="irow-label">PRODUTORAS</span>
+              <span class="irow-val">{{ movie.production_companies.slice(0,3).map(c => c.name).join(' / ') }}</span>
+            </div>
+            <div v-if="movie.spoken_languages?.length" class="info-row">
+              <span class="irow-label">IDIOMAS</span>
+              <span class="irow-val">{{ movie.spoken_languages.map(l => l.name).join(', ') }}</span>
             </div>
           </div>
-  
-          <!-- Production info -->
-          <div class="panel info-panel">
-            <div class="panel-header"><span class="panel-icon">◈</span> DADOS DE PRODUÇÃO</div>
-            <div class="info-rows">
-              <div v-if="movie.budget" class="info-row">
-                <span class="irow-label">ORÇAMENTO</span>
-                <span class="irow-val">{{ formatMoney(movie.budget) }}</span>
+
+          <div class="rating-visual">
+            <div class="rv-label">APROVAÇÃO DA AUDIÊNCIA</div>
+            <div class="rv-bar-wrap">
+              <div class="rv-bar">
+                <div class="rv-fill" :style="{ width: (movie.vote_average * 10) + '%' }"></div>
               </div>
-              <div v-if="movie.revenue" class="info-row">
-                <span class="irow-label">RECEITA</span>
-                <span class="irow-val amber">{{ formatMoney(movie.revenue) }}</span>
-              </div>
-              <div v-if="movie.production_countries?.length" class="info-row">
-                <span class="irow-label">PAÍSES</span>
-                <span class="irow-val">{{ movie.production_countries.map(c => c.name).join(', ') }}</span>
-              </div>
-              <div v-if="movie.production_companies?.length" class="info-row">
-                <span class="irow-label">PRODUTORAS</span>
-                <span class="irow-val">{{ movie.production_companies.slice(0,3).map(c => c.name).join(' / ') }}</span>
-              </div>
-              <div v-if="movie.spoken_languages?.length" class="info-row">
-                <span class="irow-label">IDIOMAS</span>
-                <span class="irow-val">{{ movie.spoken_languages.map(l => l.name).join(', ') }}</span>
-              </div>
-            </div>
-  
-            <!-- Rating bar -->
-            <div class="rating-visual">
-              <div class="rv-label">APROVAÇÃO DA AUDIÊNCIA</div>
-              <div class="rv-bar-wrap">
-                <div class="rv-bar">
-                  <div class="rv-fill" :style="{ width: (movie.vote_average * 10) + '%' }"></div>
-                </div>
-                <span class="rv-pct">{{ Math.round(movie.vote_average * 10) }}%</span>
-              </div>
+              <span class="rv-pct">{{ Math.round(movie.vote_average * 10) }}%</span>
             </div>
           </div>
-  
-          <!-- Similar movies -->
-          <div v-if="similar.length" class="panel similar-panel">
-            <div class="panel-header"><span class="panel-icon">◈</span> TÍTULOS SIMILARES</div>
-            <div class="similar-grid">
-              <div
-                v-for="s in similar"
-                :key="s.id"
-                class="similar-item"
-                @click="router.push({ name: 'MovieDetail', params: { id: s.id } })"
-              >
-                <img
-                  v-if="s.poster_path"
-                  :src="`https://image.tmdb.org/t/p/w154${s.poster_path}`"
-                  :alt="s.title"
-                  class="similar-poster"
-                />
-                <div v-else class="similar-no-img">▣</div>
-                <div class="similar-title">{{ s.title }}</div>
-                <div class="similar-year">{{ s.release_date?.substring(0,4) }}</div>
-              </div>
+        </div>
+
+        <div v-if="similar.length" class="panel similar-panel">
+          <div class="panel-header"><span class="panel-icon">◈</span> TÍTULOS SIMILARES</div>
+          <div class="similar-grid">
+            <div
+              v-for="s in similar"
+              :key="s.id"
+              class="similar-item"
+              @click="router.push({ name: 'MovieDetail', params: { id: s.id } })"
+            >
+              <img
+                v-if="s.poster_path"
+                :src="`https://image.tmdb.org/t/p/w154${s.poster_path}`"
+                :alt="s.title"
+                class="similar-poster"
+              />
+              <div v-else class="similar-no-img">▣</div>
+              <div class="similar-title">{{ s.title }}</div>
+              <div class="similar-year">{{ s.release_date?.substring(0,4) }}</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </template>
-  
-  <script setup>
+  </div>
+</template>
+
+<script setup>
   import { ref, computed, onMounted, watch } from 'vue'
   import { useRouter, useRoute } from 'vue-router'
   
@@ -257,7 +247,6 @@
     movie.value = null
     visibleLines.value = 0
   
-    // Terminal typing effect
     const lineInterval = setInterval(() => {
       if (visibleLines.value < termLines.length) visibleLines.value++
       else clearInterval(lineInterval)
@@ -286,12 +275,15 @@
   
   onMounted(fetchDetail)
   watch(() => route.params.id, fetchDetail)
-  </script>
+</script>
+
+<style scoped>
+  .detail-page { 
+    min-height: 100vh; 
+    display: flex; 
+    flex-direction: column; 
+  }
   
-  <style scoped>
-  .detail-page { min-height: 100vh; display: flex; flex-direction: column; }
-  
-  /* ─── NAV ─── */
   .topnav {
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border);
@@ -313,7 +305,11 @@
     transition: all 0.15s;
     white-space: nowrap;
   }
-  .back-btn:hover { background: var(--crt-green); color: var(--bg-dark); }
+
+  .back-btn:hover { 
+    background: var(--crt-green); 
+    color: var(--bg-dark); 
+  }
   
   .breadcrumb {
     font-family: var(--font-mono);
@@ -325,15 +321,18 @@
     gap: 0.5rem;
     overflow: hidden;
   }
-  .sep { color: rgba(0,255,65,0.2); }
+
+  .sep { 
+    color: rgba(0,255,65,0.2); 
+  }
+
   .crumb-title {
     color: var(--crt-amber);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  
-  /* ─── CENTER STATES ─── */
+
   .center-state {
     flex: 1;
     display: flex;
@@ -341,8 +340,17 @@
     justify-content: center;
     padding: 4rem;
   }
-  .center-state.error { flex-direction: column; gap: 1rem; color: var(--crt-red); }
-  .err-code { font-family: var(--font-pixel); font-size: 1.5rem; }
+
+  .center-state.error { 
+    flex-direction: column;
+    gap: 1rem; 
+    color: var(--crt-red); 
+  }
+
+  .err-code { 
+    font-family: var(--font-pixel); 
+    font-size: 1.5rem; 
+  }
   
   .terminal-loader {
     background: var(--bg-panel);
@@ -372,9 +380,12 @@
     letter-spacing: 0.2em;
     transition: all 0.2s;
   }
-  .retro-btn:hover { background: var(--crt-green); color: var(--bg-dark); }
+
+  .retro-btn:hover { 
+    background: var(--crt-green); 
+    color: var(--bg-dark); 
+  }
   
-  /* ─── HERO ─── */
   .hero {
     position: relative;
     padding: 3rem 2rem;
@@ -387,12 +398,7 @@
   .hero-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      to right,
-      rgba(5,10,5,0.98) 0%,
-      rgba(5,10,5,0.85) 50%,
-      rgba(5,10,5,0.75) 100%
-    );
+    background: linear-gradient(to right,rgba(5,10,5,0.98) 0%, rgba(5,10,5,0.85) 50%, rgba(5,10,5,0.75) 100%);
     backdrop-filter: grayscale(0.4) contrast(1.05);
   }
   
@@ -405,8 +411,9 @@
     align-items: flex-start;
   }
   
-  /* Poster */
-  .poster-col { flex-shrink: 0; }
+  .poster-col { 
+    flex-shrink: 0; 
+  }
   
   .poster-frame {
     width: 220px;
@@ -415,7 +422,11 @@
     overflow: hidden;
   }
   
-  .hero-poster { width: 100%; display: block; filter: contrast(1.05) saturate(0.85); }
+  .hero-poster { 
+    width: 100%; 
+    display: block; 
+    filter: contrast(1.05) saturate(0.85); 
+  }
   
   .no-img {
     width: 100%;
@@ -432,7 +443,9 @@
     gap: 0.5rem;
   }
   
-  .poster-badge-row { margin-top: 0.75rem; }
+  .poster-badge-row { 
+    margin-top: 0.75rem; 
+  }
   
   .big-score {
     background: var(--bg-panel);
@@ -451,6 +464,7 @@
     color: var(--crt-amber);
     letter-spacing: 0.2em;
   }
+
   .score-num {
     font-family: var(--font-vt);
     font-size: 2rem;
@@ -458,14 +472,16 @@
     line-height: 1;
     text-shadow: 0 0 10px var(--crt-amber);
   }
+
   .score-max {
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: rgba(255,176,0,0.5);
   }
   
-  /* Info col */
-  .info-col { flex: 1; }
+  .info-col { 
+    flex: 1; 
+  }
   
   .title-pre {
     font-family: var(--font-mono);
@@ -493,7 +509,6 @@
     letter-spacing: 0.05em;
   }
   
-  /* Meta grid */
   .meta-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -504,7 +519,11 @@
     background: rgba(0,255,65,0.02);
   }
   
-  .meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .meta-item { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 2px; 
+  }
   
   .meta-label {
     font-family: var(--font-mono);
@@ -520,9 +539,10 @@
     letter-spacing: 0.05em;
   }
   
-  .status-tag { color: var(--crt-amber); }
+  .status-tag { 
+    color: var(--crt-amber); 
+  }
   
-  /* Genres */
   .genres {
     display: flex;
     flex-wrap: wrap;
@@ -539,7 +559,6 @@
     letter-spacing: 0.1em;
   }
   
-  /* Overview */
   .section-label {
     font-family: var(--font-mono);
     font-size: 0.7rem;
@@ -557,7 +576,6 @@
     letter-spacing: 0.02em;
   }
   
-  /* ─── PANELS ─── */
   .panels {
     display: flex;
     flex-direction: column;
@@ -586,10 +604,15 @@
     gap: 0.5rem;
   }
   
-  .panel-icon { color: var(--crt-green); }
-  .panel-count { color: rgba(0,255,65,0.4); margin-left: auto; }
+  .panel-icon { 
+    color: var(--crt-green); 
+  }
+
+  .panel-count { 
+    color: rgba(0,255,65,0.4);
+    margin-left: auto; 
+  }
   
-  /* Cast */
   .cast-list {
     display: flex;
     gap: 0;
@@ -636,7 +659,9 @@
     font-size: 1.1rem;
   }
   
-  .cast-info { text-align: center; }
+  .cast-info { 
+    text-align: center; 
+  }
   
   .cast-name {
     font-family: var(--font-mono);
@@ -661,10 +686,13 @@
     width: 90px;
   }
   
-  /* Info panel */
-  .info-panel { padding-bottom: 1rem; }
+  .info-panel { 
+    padding-bottom: 1rem; 
+  }
   
-  .info-rows { padding: 1rem 1.25rem; }
+  .info-rows { 
+    padding: 1rem 1.25rem; 
+  }
   
   .info-row {
     display: flex;
@@ -684,10 +712,17 @@
     flex-shrink: 0;
   }
   
-  .irow-val { color: rgba(0,255,65,0.8); }
-  .irow-val.amber { color: var(--crt-amber); }
+  .irow-val { 
+    color: rgba(0,255,65,0.8); 
+  }
+
+  .irow-val.amber { 
+    color: var(--crt-amber); 
+  }
   
-  .rating-visual { padding: 1rem 1.25rem; }
+  .rating-visual { 
+    padding: 1rem 1.25rem; 
+  }
   
   .rv-label {
     font-family: var(--font-mono);
@@ -697,7 +732,11 @@
     margin-bottom: 0.5rem;
   }
   
-  .rv-bar-wrap { display: flex; align-items: center; gap: 1rem; }
+  .rv-bar-wrap { 
+    display: flex; 
+    align-items: center; 
+    gap: 1rem; 
+  }
   
   .rv-bar {
     flex: 1;
@@ -721,7 +760,6 @@
     text-align: right;
   }
   
-  /* Similar */
   .similar-grid {
     display: flex;
     gap: 1rem;
@@ -738,8 +776,13 @@
     transition: all 0.2s;
   }
   
-  .similar-item:hover { transform: translateY(-4px); }
-  .similar-item:hover .similar-title { color: var(--crt-green); }
+  .similar-item:hover { 
+    transform: translateY(-4px); 
+  }
+
+  .similar-item:hover .similar-title { 
+    color: var(--crt-green); 
+  }
   
   .similar-poster {
     width: 100%;
@@ -789,11 +832,26 @@
   }
   
   @media (max-width: 768px) {
-    .hero-content { flex-direction: column; align-items: center; }
-    .poster-frame { width: 180px; }
-    .meta-grid { grid-template-columns: repeat(2, 1fr); }
-    .info-col { width: 100%; }
-    .movie-title { font-size: 2rem; }
+    .hero-content { 
+      flex-direction: column; 
+      align-items: center; 
+    }
+
+    .poster-frame { 
+      width: 180px; 
+    }
+
+    .meta-grid { 
+      grid-template-columns: repeat(2, 1fr); 
+    }
+
+    .info-col { 
+      width: 100%; 
+    }
+
+    .movie-title { 
+      font-size: 2rem; 
+    }
   }
-  </style>
+</style>
   
