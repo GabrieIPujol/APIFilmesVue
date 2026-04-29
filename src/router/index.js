@@ -8,7 +8,7 @@ const routes = [
 ]
 
 export default createRouter({
-  history: createWebHashHistory(),
+  history: createWebHashHistory('/APIFilmesVue/'),
   routes,
   scrollBehavior() {
     return { top: 0 }
