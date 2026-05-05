@@ -10,7 +10,7 @@ export default defineConfig({
     vue(),
     // vueDevTools(),
   ],
-  base: '/APIFilmesVue/',
+  base: '/CineRetro/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
